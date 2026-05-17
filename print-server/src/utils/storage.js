@@ -2,7 +2,7 @@ const config = require('../config');
 const path = require('path');
 const fs = require('fs');
 
-const UPLOAD_DIR = path.resolve(__dirname, '..', '..', config.upload.dir);
+const UPLOAD_DIR = path.resolve(config.upload.dir);
 
 function ensureUploadDir() {
   if (!fs.existsSync(UPLOAD_DIR)) {
