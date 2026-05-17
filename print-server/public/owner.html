@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>店主后台 - 自助打印</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .price-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid var(--gray-100);
+    }
+    .price-row input {
+      width: 80px; padding: 6px 10px; border: 1px solid var(--gray-300);
+      border-radius: 6px; text-align: center; font-size: 14px;
+    }
+    .toggle-switch {
+      width: 44px; height: 24px; border-radius: 12px;
+      background: var(--gray-300); position: relative;
+      cursor: pointer; transition: background .2s;
+    }
+    .toggle-switch.on { background: var(--primary); }
+    .toggle-switch::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; transition: transform .2s;
+    }
+    .toggle-switch.on::after { transform: translateX(20px); }
+  </style>
+</head>
+<body>
+  <div class="nav-bar">
+    <span class="nav-title">店主后台</span>
+    <a href="/staff.html" class="btn btn-sm btn-outline">店员模式</a>
+  </div>
+
+  <div class="tab-bar" id="ownerTabs">
+    <div class="tab-item active" data-tab="dashboard">概览</div>
+    <div class="tab-item" data-tab="pricing">定价</div>
+    <div class="tab-item" data-tab="printers">打印机</div>
+    <div class="tab-item" data-tab="options">选项</div>
+    <div class="tab-item" data-tab="stats">统计</div>
+  </div>
+
+  <div class="container">
+    <!-- 概览 -->
+    <div class="tab-content active" id="tab-dashboard">
+      <div class="stats-grid" id="dashStats" style="margin-top:16px">
+        <div class="stat-card"><div class="stat-value" id="statTodayRevenue">¥0</div><div class="stat-label">今日收入</div></div>
+        <div class="stat-card"><div class="stat-value" id="statTodayOrders">0</div><div class="stat-label">今日订单</div></div>
+        <div class="stat-card"><div class="stat-value" id="statMonthRevenue">¥0</div><div class="stat-label">本月收入</div></div>
+        <div class="stat-card"><div class="stat-value" id="statMonthOrders">0</div><div class="stat-label">本月订单</div></div>
+      </div>
+      <div id="dashPrinters" style="margin-top:12px"></div>
+    </div>
+
+    <!-- 定价 -->
+    <div class="tab-content" id="tab-pricing">
+      <div class="card" style="margin-top:16px">
+        <div style="font-weight:700;margin-bottom:12px">📊 定价配置</div>
+        <div id="priceList">加载中...</div>
+        <button class="btn btn-primary btn-block" style="margin-top:12px" onclick="savePrices()">保存定价</button>
+      </div>
+    </div>
+
+    <!-- 打印机 -->
+    <div class="tab-content" id="tab-printers">
+      <div class="card" style="margin-top:16px">
+        <div style="font-weight:700;margin-bottom:12px">🖨️ 打印机管理</div>
+        <div style="margin-bottom:10px;padding:10px;background:#f0fdf4;border-radius:8px;font-size:13px;color:#065f46;display:none" id="printerHint">
+          💡 在店内电脑上运行 <b>print-agent</b>，代理会自动检测并上报本地打印机。下方也可手动管理。
+        </div>
+        <div id="printerList">加载中...</div>
+        <button class="btn btn-outline btn-block btn-sm" style="margin-top:8px" onclick="addPrinter()">+ 手动添加打印机</button>
+        <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="savePrinters()">保存打印机</button>
+      </div>
+    </div>
+
+    <!-- 选项开关 -->
+    <div class="tab-content" id="tab-options">
+      <div class="card" style="margin-top:16px">
+        <div style="font-weight:700;margin-bottom:12px">🔧 顾客端选项开关</div>
+        <div id="optionsList">加载中...</div>
+        <button class="btn btn-primary btn-block" style="margin-top:12px" onclick="saveOptions()">保存选项</button>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:12px">⚙️ 默认值</div>
+        <div class="form-group">
+          <label class="form-label">默认纸张</label>
+          <select class="form-input" id="defaultPaper">
+            <option value="A4">A4</option><option value="A3">A3</option><option value="A5">A5</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">默认色彩</label>
+          <select class="form-input" id="defaultColor">
+            <option value="bw">黑白</option><option value="color">彩色</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">默认单双面</label>
+          <select class="form-input" id="defaultDuplex">
+            <option value="single">单面</option><option value="double">双面</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">默认份数</label>
+          <input class="form-input" type="number" id="defaultCopies" value="1" min="1">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="saveDefaults()">保存默认值</button>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:12px">🕐 营业设置</div>
+        <div class="form-group">
+          <label class="form-label">营业开始</label>
+          <input class="form-input" type="time" id="bizOpen" value="08:00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">营业结束</label>
+          <input class="form-input" type="time" id="bizClose" value="22:00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">最大排队数</label>
+          <input class="form-input" type="number" id="maxQueue" value="20" min="1">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="saveShopConfig()">保存营业设置</button>
+      </div>
+    </div>
+
+    <!-- 统计 -->
+    <div class="tab-content" id="tab-stats">
+      <div class="card" style="margin-top:16px">
+        <div style="font-weight:700;margin-bottom:12px">📈 每日业务分布</div>
+        <div id="statsBreakdown">加载中...</div>
+      </div>
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:12px">⏰ 今日高峰时段</div>
+        <div id="statsHourly">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" style="display:none"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/owner.js"></script>
+</body>
+</html>

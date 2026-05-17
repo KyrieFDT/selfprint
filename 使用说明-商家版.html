@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>自助打印系统 - 使用说明</title>
+<style>
+  body { font-family: '微软雅黑', sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.8; font-size: 14px; }
+  h1 { text-align: center; font-size: 22px; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 30px; }
+  h2 { font-size: 18px; margin-top: 28px; padding: 8px 12px; background: #f0f0f0; border-left: 4px solid #4f46e5; }
+  h3 { font-size: 15px; margin-top: 20px; color: #4f46e5; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  table th, table td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; font-size: 13px; }
+  table th { background: #f5f5f5; font-weight: bold; }
+  ul, ol { padding-left: 24px; }
+  li { margin-bottom: 4px; }
+  .highlight { background: #fffde7; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+  .step { display: inline-block; width: 24px; height: 24px; line-height: 24px; text-align: center; background: #4f46e5; color: #fff; border-radius: 50%; font-size: 13px; font-weight: bold; margin-right: 6px; }
+  .note { background: #eef2ff; padding: 10px 14px; border-radius: 6px; margin: 12px 0; font-size: 13px; border-left: 3px solid #4f46e5; }
+  .warn { background: #fef3c7; padding: 10px 14px; border-radius: 6px; margin: 12px 0; font-size: 13px; border-left: 3px solid #f59e0b; }
+  hr { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+</style>
+</head>
+<body>
+
+<h1>自助打印系统 · 使用说明</h1>
+<p class="subtitle">适用于照相馆 / 文印店 | 版本 v1.0</p>
+
+<h2>一、这个系统是干什么的</h2>
+
+<p>顾客来店里打印文件，<b>不用再排队等店员操作电脑</b>。</p>
+
+<p>顾客用<b>自己手机</b>扫码 → 上传文件 → 预览排版 → 选好设置 → 到前台付款 → <b>打印机自动打印</b>。</p>
+
+<p>店员只需要确认收款，系统自动算钱、排队、打印一条龙。</p>
+
+<h2>二、第一天怎么用（5 分钟）</h2>
+
+<h3>你需要准备</h3>
+<ul>
+  <li>一台 Windows 电脑（Win10 或 Win11）</li>
+  <li>电脑已经连着打印机（平时能正常打印就行）</li>
+  <li>店里有 WiFi（顾客手机要连，和电脑同一个 WiFi）</li>
+</ul>
+
+<h3>操作步骤</h3>
+
+<p><span class="step">1</span> <b>把整个文件夹拷到电脑上任意位置</b></p>
+<p>文件夹里有一个 <span class="highlight">启动.bat</span>，每天双击它就行。</p>
+
+<p><span class="step">2</span> <b>双击"启动.bat"</b></p>
+<p>会自动弹出店家工作台页面，左上角显示一个二维码。</p>
+
+<p><span class="step">3</span> <b>顾客扫码进入系统</b></p>
+<p>顾客手机连店 WiFi → 打开微信扫一扫 → 扫二维码 → 开始使用。</p>
+
+<div class="note">
+  <b>提示：</b>如果顾客手机微信扫不了，让顾客打开浏览器，输入店家工作台左上角显示的网址（如 192.168.1.100:3000）。
+</div>
+
+<h2>三、顾客怎么用（手机上的流程）</h2>
+
+<p>顾客扫码进入后，一共 <b>5 步</b>：</p>
+
+<table>
+  <tr><th>步骤</th><th>做什么</th><th>说明</th></tr>
+  <tr><td>① 登录</td><td>输入昵称</td><td>随便填，不用注册</td></tr>
+  <tr><td>② 上传文件</td><td>选 PDF / Word / 图片</td><td>最大 50MB</td></tr>
+  <tr><td>③ 预览排版</td><td>翻页查看每页效果</td><td>不满意可"一键转标准PDF"</td></tr>
+  <tr><td>④ 选择设置</td><td>纸张、黑白/彩色、单双面、份数</td><td>右边实时显示价格</td></tr>
+  <tr><td>⑤ 提交订单</td><td>显示"请到前台付款"</td><td>付完钱后手机显示排队状态</td></tr>
+</table>
+
+<p>顾客手机上能实时看到：<b>前面还有几个订单、大概等几分钟</b>。</p>
+
+<h2>四、店家怎么用（电脑上的操作）</h2>
+
+<p>双击"启动.bat"后打开的页面就是店家工作台。</p>
+
+<h3>页面说明</h3>
+
+<table>
+  <tr><th>位置</th><th>内容</th><th>用途</th></tr>
+  <tr><td>左上</td><td>二维码</td><td>顾客扫这个进系统</td></tr>
+  <tr><td>左下</td><td>打印机状态</td><td>看打印机在线还是离线</td></tr>
+  <tr><td>左下</td><td>今日概览</td><td>今天多少单、收了多少钱</td></tr>
+  <tr><td>右侧</td><td>订单管理</td><td>三个标签页（见下方）</td></tr>
+</table>
+
+<h3>三个标签页</h3>
+
+<p><b>① 待确认</b> — 顾客下单但还没付款的</p>
+<ul>
+  <li>顾客付了钱 → 点 <span class="highlight">确认收款</span> → 订单自动进入打印队列</li>
+  <li>也可以点 <span class="highlight">预览</span> 看文件，或点 <span class="highlight">取消</span></li>
+</ul>
+
+<p><b>② 打印队列</b> — 已确认、排队等待打印的</p>
+<ul>
+  <li>点 <span class="highlight">开始打印</span> → 电脑自动打印 → 打完点 <span class="highlight">完成</span></li>
+  <li>也可以 <span class="highlight">预览</span>（和顾客看到的预览一样，支持翻页）</li>
+  <li>不想打了可以点 <span class="highlight">取消</span> 移出队列</li>
+</ul>
+
+<p><b>③ 已完成</b> — 打印完的订单记录</p>
+
+<div class="warn">
+  <b>注意：</b>电脑重启后之前的订单记录会清空。正式版会保留。
+</div>
+
+<h2>五、店家怎么改设置</h2>
+
+<p>登录页面点 <span class="highlight">"店主"</span> 快捷按钮进入后台。</p>
+
+<h3>改价格</h3>
+<p>"定价"标签 → 修改金额 → 点保存。改完立即生效。</p>
+<table>
+  <tr><th>规格</th><th>默认单价</th></tr>
+  <tr><td>A4 黑白单面</td><td>¥1.00</td></tr>
+  <tr><td>A4 黑白双面</td><td>¥1.50</td></tr>
+  <tr><td>A4 彩色单面</td><td>¥3.00</td></tr>
+  <tr><td>A4 彩色双面</td><td>¥5.00</td></tr>
+  <tr><td>A3 倍率</td><td>×2.00（A3=A4价×2）</td></tr>
+</table>
+
+<h3>管理打印机</h3>
+<p>"打印机"标签。电脑上连接的打印机会自动检测出来。也可以手动添加。</p>
+
+<h3>控制顾客端显示</h3>
+<p>"选项"标签。比如不想让顾客选装订方式，关掉对应开关，顾客端立刻不显示。</p>
+
+<h3>设置默认值</h3>
+<p>"选项"标签往下滑，设置默认纸张、颜色、份数。顾客进来就是这些默认值。</p>
+
+<h2>六、常见问题</h2>
+
+<p><b>Q：顾客扫不了码？</b></p>
+<p>检查：① 顾客手机和电脑是不是<b>同一个 WiFi</b>；② 电脑 IP 可能变了，看店家工作台左上角显示的地址，让顾客手动输入。</p>
+
+<p><b>Q：打印机没反应？</b></p>
+<p>看店家工作台的打印机状态。显示<b>"在线"</b>就正常。显示<b>"离线"</b>说明打印代理停了，重新双击"启动.bat"。</p>
+
+<p><b>Q：电脑重启后要做什么？</b></p>
+<p>重新双击"启动.bat"即可。之前的订单记录会清空（当前版本限制）。</p>
+
+<p><b>Q：顾客文件预览不出来？</b></p>
+<p>一般是大文件加载慢，等一会儿。如果一直出不来，让顾客点"排版有问题 → 一键转标准PDF"重新生成。</p>
+
+<p><b>Q：怎么同时给顾客看又自己操作？</b></p>
+<p>店家工作台在电脑上，顾客用自己手机扫码访问。互不影响。</p>
+
+<p><b>Q：想改价格/加打印机/关掉某个选项？</b></p>
+<p>登录店主后台，改完保存立即生效，不用重启。</p>
+
+<hr>
+<p style="text-align:center;color:#999;font-size:12px;">如有问题或需要升级功能，请联系系统提供方。</p>
+
+</body>
+</html>

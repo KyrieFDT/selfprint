@@ -1,0 +1,16 @@
+{
+  "name": "self-print-agent",
+  "version": "1.0.0",
+  "description": "照相馆自助打印系统 - PC打印代理",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.4",
+    "axios": "^1.6.5",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.3.1"
+  }
+}

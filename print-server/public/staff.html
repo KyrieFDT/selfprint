@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>店员工作台 - 自助打印</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .queue-card {
+      background: #fff; border-radius: var(--radius); padding: 16px;
+      margin-bottom: 8px; box-shadow: var(--shadow);
+      display: flex; justify-content: space-between; align-items: center;
+      border-left: 4px solid var(--primary);
+    }
+    .queue-card.expedited { border-left-color: var(--danger); }
+    .printer-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600;
+    }
+    .printer-online { background: #d1fae5; color: #065f46; }
+    .printer-offline { background: #fee2e2; color: #991b1b; }
+    .printer-printing { background: #e0e7ff; color: #3730a3; }
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      display: flex; align-items: center; justify-content: center; z-index: 200;
+    }
+    .modal {
+      background: #fff; border-radius: var(--radius); padding: 24px;
+      max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;
+    }
+    .config-editor { margin-bottom: 12px; }
+    .config-editor input { width: 80px; padding: 6px 10px; border: 1px solid var(--gray-300); border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="nav-bar">
+    <span class="nav-title">店员工作台</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm btn-outline" onclick="refreshAll()">刷新</button>
+    </div>
+  </div>
+
+  <div class="tab-bar" id="staffTabs">
+    <div class="tab-item active" onclick="switchTab('queue')">打印队列</div>
+    <div class="tab-item" onclick="switchTab('printing')">打印中</div>
+    <div class="tab-item" onclick="switchTab('completed')">已完成</div>
+    <div class="tab-item" onclick="switchTab('offline')">代下单</div>
+  </div>
+
+  <div class="container">
+    <!-- 打印机状态 -->
+    <div style="padding:12px 0;display:flex;gap:8px;flex-wrap:wrap" id="printerStatusBar"></div>
+
+    <!-- 队列 Tab -->
+    <div id="tab-queue" class="tab-content">
+      <div id="queueList"><div class="empty-state">加载中...</div></div>
+    </div>
+
+    <!-- 打印中 Tab -->
+    <div id="tab-printing" class="tab-content" style="display:none">
+      <div id="printingList"><div class="empty-state">暂无打印中的订单</div></div>
+    </div>
+
+    <!-- 已完成 Tab -->
+    <div id="tab-completed" class="tab-content" style="display:none">
+      <div id="completedList"><div class="empty-state">加载中...</div></div>
+    </div>
+
+    <!-- 代下单 Tab -->
+    <div id="tab-offline" class="tab-content" style="display:none">
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:16px">📝 店员代下单</div>
+        <div class="form-group">
+          <label class="form-label">顾客称呼</label>
+          <input class="form-input" id="offlineCustName" placeholder="如：张先生">
+        </div>
+        <div class="form-group">
+          <label class="form-label">文件</label>
+          <input type="file" id="offlineFileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.bmp">
+        </div>
+        <div class="form-group">
+          <label class="form-label">纸张</label>
+          <select class="form-input" id="offlinePaper">
+            <option value="A4">A4</option><option value="A3">A3</option><option value="A5">A5</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">色彩</label>
+          <select class="form-input" id="offlineColor">
+            <option value="bw">黑白</option><option value="color">彩色</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">单双面</label>
+          <select class="form-input" id="offlineDuplex">
+            <option value="single">单面</option><option value="double">双面</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">份数</label>
+          <input class="form-input" type="number" id="offlineCopies" value="1" min="1" max="99">
+        </div>
+        <div class="form-group">
+          <label class="form-label">支付方式</label>
+          <select class="form-input" id="offlinePay">
+            <option value="cash">现金</option><option value="wechat">微信</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="staffCreateOrder()">创建订单并入队</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" style="display:none"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/staff.js"></script>
+</body>
+</html>

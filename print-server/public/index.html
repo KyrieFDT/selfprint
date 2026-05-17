@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>自助打印系统</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    #pvScaleBar .btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .paper-sheet {
+      background: #fff; box-shadow: 0 2px 16px rgba(0,0,0,.15);
+      position: relative; overflow: hidden;
+    }
+    .paper-content {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      transition: width 0.2s, height 0.2s;
+    }
+    .paper-content canvas {
+      width: 100%; height: 100%; display: block;
+    }
+    .page-nav-floating {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; gap: 8px;
+    }
+    .page-nav-floating button {
+      flex: 1; max-width: 120px;
+    }
+    .page-dots {
+      display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; padding: 8px 0;
+    }
+    .page-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--gray-300);
+      cursor: pointer; transition: all .15s;
+    }
+    .page-dot.active { background: var(--primary); width: 24px; border-radius: 4px; }
+    .total-pages-info { text-align: center; font-size: 14px; color: var(--gray-500); }
+    .format-status-bar {
+      text-align: center; padding: 8px; font-size: 13px; border-radius: 8px; margin-top: 8px;
+    }
+    .quick-config-card {
+      background: #fff; border-radius: var(--radius); padding: 20px;
+      margin-bottom: 12px; box-shadow: var(--shadow);
+    }
+    .file-info-bar {
+      display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+      background: #eef2ff; border-radius: 8px; margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .file-info-bar .file-icon { font-size: 24px; }
+  </style>
+</head>
+<body>
+  <!-- 导航栏 -->
+  <div class="nav-bar" id="navBar" style="display:none">
+    <button class="btn btn-sm btn-outline" onclick="goBack()">‹ 返回</button>
+    <span class="nav-title" id="navTitle">自助打印</span>
+    <span style="width:60px"></span>
+  </div>
+
+  <!-- ========== 登录 ========== -->
+  <div class="page active" id="page-login">
+    <div class="container" style="padding-top:80px;text-align:center">
+      <h1 style="font-size:28px;margin-bottom:8px;color:var(--primary)">自助打印</h1>
+      <p style="color:var(--gray-500);margin-bottom:32px">扫码上传文件，付款即打</p>
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">昵称</label>
+          <input class="form-input" id="loginNickname" placeholder="输入昵称开始使用">
+        </div>
+        <button class="btn btn-primary btn-block btn-lg" onclick="doLogin()">进入系统</button>
+      </div>
+      <div style="margin-top:20px;font-size:13px;color:var(--gray-500)">
+        <div style="margin-bottom:8px">演示账号快速登录：</div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-sm btn-outline" onclick="quickLogin('customer')">👤 顾客</button>
+          <button class="btn btn-sm btn-outline" onclick="quickLogin('staff')">🖨️ 店员</button>
+          <button class="btn btn-sm btn-outline" onclick="quickLogin('owner')">⚙️ 店主</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 首页 ========== -->
+  <div class="page" id="page-home">
+    <div class="container">
+      <div style="text-align:center;padding:24px 0">
+        <div style="font-size:20px;font-weight:700">欢迎，<span id="homeNickname">--</span></div>
+        <div style="color:var(--gray-500);font-size:14px;margin-top:4px">选择您需要的服务</div>
+      </div>
+
+      <div class="card upload-area" onclick="document.getElementById('fileInput').click()">
+        <div style="font-size:48px;margin-bottom:12px">📄</div>
+        <div style="font-size:18px;font-weight:600;margin-bottom:4px">上传文件打印</div>
+        <div style="font-size:13px;color:var(--gray-500)">支持 PDF / Word / 图片</div>
+        <input type="file" id="fileInput" style="display:none"
+               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.bmp"
+               onchange="onFileSelected(event)">
+      </div>
+
+      <div class="card" style="cursor:pointer" onclick="showPage('history')">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-weight:600">📋 历史订单</div>
+            <div style="font-size:13px;color:var(--gray-500)">查看过往订单</div>
+          </div>
+          <span style="color:var(--gray-400)">›</span>
+        </div>
+      </div>
+
+      <div id="homeCurrentOrder" style="display:none">
+        <div class="card" style="background:#eef2ff;cursor:pointer" onclick="viewCurrentOrder()">
+          <div style="font-weight:600">📌 有进行中的订单</div>
+          <div style="font-size:13px;color:var(--gray-600);margin-top:4px" id="homeOrderStatus">点击查看</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 上传中 ========== -->
+  <div class="page" id="page-uploading">
+    <div class="container" style="text-align:center;padding-top:60px">
+      <div class="card">
+        <div style="font-size:48px;margin-bottom:16px">⏳</div>
+        <div style="font-size:18px;font-weight:600">文件上传中...</div>
+        <div style="font-size:14px;color:var(--gray-500);margin-top:8px" id="uploadStatus">正在解析页数</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 快速设置 ★新★ ========== -->
+  <div class="page" id="page-quick-config">
+    <div class="container">
+      <div class="file-info-bar">
+        <span class="file-icon">📄</span>
+        <div>
+          <div style="font-weight:600" id="qcFileName">--</div>
+          <div style="color:var(--gray-500)" id="qcFileInfo">--</div>
+        </div>
+      </div>
+
+      <div class="quick-config-card">
+        <div style="font-weight:700;font-size:16px;margin-bottom:16px">⚡ 快速设置</div>
+
+        <div class="form-group">
+          <label class="form-label">纸张大小</label>
+          <div class="option-group" id="qcPaperSize">
+            <button class="option-btn active" data-val="A4">A4</button>
+            <button class="option-btn" data-val="A3">A3</button>
+            <button class="option-btn" data-val="A5">A5</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">色彩</label>
+          <div class="option-group" id="qcColor">
+            <button class="option-btn active" data-val="bw">黑白</button>
+            <button class="option-btn" data-val="color">彩色</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">打印范围 <small style="color:var(--gray-500);font-weight:400">(留空=全部)</small></label>
+          <input class="form-input" id="qcPrintRange" placeholder="如: 1-5 或 1,3,5-7">
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" onclick="goToPreview()">
+          生成预览 →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 打印预览 · 纸张内容缩放 ========== -->
+  <div class="page" id="page-preview">
+    <div class="container" style="max-width:600px">
+      <!-- 文件信息 -->
+      <div class="card" style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-weight:600;font-size:14px"><span id="pvFileName">--</span></span>
+        <span style="font-size:12px;color:var(--gray-500)" id="pvConfig">--</span>
+      </div>
+
+      <!-- 截断警告 -->
+      <div id="pvTruncWarn" style="display:none;text-align:center;padding:10px;background:#fef3c7;color:#92400e;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:8px"></div>
+
+      <!-- 纸张预览区 -->
+      <div style="background:var(--gray-200);border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:center;min-height:460px">
+        <!-- 加载/错误 -->
+        <div id="pvLoading" style="text-align:center">
+          <div style="font-size:36px;margin-bottom:8px">⏳</div>
+          <div style="color:var(--gray-500)">正在渲染预览...</div>
+        </div>
+        <div id="pvError" style="display:none;text-align:center">
+          <div style="font-size:36px;margin-bottom:8px">⚠️</div>
+          <div style="color:var(--danger);margin-bottom:8px" id="pvErrorMsg">预览加载失败</div>
+          <button class="btn btn-sm btn-outline" onclick="retryPreview()">重试</button>
+        </div>
+        <!-- 纸张 + 内容区 -->
+        <div class="paper-sheet" id="pvPaperSheet" style="display:none;width:100%;max-width:380px;aspect-ratio:0.707">
+          <div class="paper-content" id="pvContent">
+            <canvas id="pvCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- 翻页 -->
+      <div class="card" style="padding:10px 16px">
+        <div class="page-nav-floating" id="pvNav" style="display:none">
+          <button class="btn btn-outline btn-sm" onclick="pvPrev()" id="pvBtnPrev" style="min-width:80px">◀ 上一页</button>
+          <div style="text-align:center">
+            <div style="font-weight:700;font-size:14px" id="pvIndicator">1 / 1</div>
+            <div style="font-size:11px;color:var(--gray-400)">共<span id="pvTotalPages">0</span>页</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="pvNext()" id="pvBtnNext" style="min-width:80px">下一页 ▶</button>
+        </div>
+        <div class="page-dots" id="pvDots" style="margin-top:6px"></div>
+      </div>
+
+      <!-- 内容缩放控制 -->
+      <div class="card" style="padding:14px 16px" id="pvScaleBar" style="display:none">
+        <div style="font-weight:600;font-size:14px;margin-bottom:10px">📐 内容占纸张比例</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;margin-bottom:8px">
+          <button class="btn btn-sm btn-outline scale-preset active" onclick="pvScaleMode('fit')" id="btnScaleFit">适合纸张</button>
+          <button class="btn btn-sm btn-outline scale-preset" onclick="pvScaleMode('100')" id="btnScale100">100%</button>
+          <button class="btn btn-sm btn-outline scale-preset" onclick="pvScaleMode('custom')" id="btnScaleCustom">自定义</button>
+        </div>
+        <div id="pvCustomScale" style="display:none;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px">
+          <button class="btn btn-sm btn-outline" onclick="pvScaleDelta(-5)">−5</button>
+          <span style="font-size:20px;font-weight:800;min-width:56px;text-align:center" id="pvScalePct">100%</span>
+          <button class="btn btn-sm btn-outline" onclick="pvScaleDelta(5)">+5</button>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-sm btn-outline margin-toggle active" id="btnAutoMargin" onclick="pvToggleMargin()">✓ 自适应边距</button>
+        </div>
+      </div>
+
+      <!-- 排版处理 + 确认 -->
+      <div class="card">
+        <button class="btn btn-outline btn-block" id="btnFormatDoc" onclick="formatDocument()">
+          🔧 排版有问题？一键转标准PDF
+        </button>
+        <div class="format-status-bar" id="pvFormatStatus" style="display:none"></div>
+        <button class="btn btn-primary btn-block btn-lg" style="margin-top:12px" onclick="confirmFromPreview()">
+          排版确认，继续设置 →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 详细配置 ========== -->
+  <div class="page" id="page-config">
+    <div class="container">
+      <div class="card">
+        <div style="font-weight:700;font-size:16px;margin-bottom:16px">⚙️ 打印设置</div>
+
+        <div class="form-group" id="groupDuplex">
+          <label class="form-label">单双面</label>
+          <div class="option-group" id="optDuplex">
+            <button class="option-btn active" data-val="single">单面</button>
+            <button class="option-btn" data-val="double">双面</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">每面页数</label>
+          <div class="option-group" id="optLayout">
+            <button class="option-btn active" data-val="1in1">1页</button>
+            <button class="option-btn" data-val="2in1">2页</button>
+            <button class="option-btn" data-val="4in1">4页</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">份数</label>
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn btn-outline btn-sm" onclick="changeCopies(-1)">−</button>
+            <span style="font-size:24px;font-weight:700;min-width:40px;text-align:center" id="copiesDisplay">1</span>
+            <button class="btn btn-outline btn-sm" onclick="changeCopies(1)">+</button>
+          </div>
+        </div>
+
+        <div class="form-group" id="groupBinding">
+          <label class="form-label">装订</label>
+          <div class="option-group" id="optBinding">
+            <button class="option-btn active" data-val="none">不装订</button>
+            <button class="option-btn" data-val="staple">边订</button>
+            <button class="option-btn" data-val="glue">胶装</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-weight:600">订单摘要</span>
+          <span style="font-size:12px;color:var(--gray-500)" id="cfgSummary">--</span>
+        </div>
+        <div class="price-display" id="priceDisplay" style="padding:8px 0">¥ --</div>
+        <div style="text-align:center;font-size:13px;color:var(--gray-500);margin-bottom:12px" id="priceDetail"></div>
+        <div style="text-align:center;font-size:13px;color:var(--gray-500);margin-bottom:8px" id="waitEstimate"></div>
+        <button class="btn btn-primary btn-block btn-lg" id="btnSubmit" onclick="submitOrder()">
+          💳 提交订单并支付
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 订单跟踪 ========== -->
+  <div class="page" id="page-track">
+    <div class="container">
+      <div class="card">
+        <div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:8px">
+          订单 <span id="trackOrderNo">--</span>
+        </div>
+
+        <div class="progress-steps" id="trackSteps">
+          <div class="step" id="stepPay"><div class="step-dot"></div><span class="step-label">待支付</span></div>
+          <div class="step" id="stepPaid"><div class="step-dot"></div><span class="step-label">已支付</span></div>
+          <div class="step" id="stepPrint"><div class="step-dot"></div><span class="step-label">打印中</span></div>
+          <div class="step" id="stepDone"><div class="step-dot"></div><span class="step-label">完成</span></div>
+        </div>
+
+        <div class="queue-status" id="queueStatus" style="display:none">
+          <div style="font-size:14px;color:var(--gray-500)">前面还有</div>
+          <div class="number" id="queuePosition">--</div>
+          <div style="font-size:14px;color:var(--gray-500)">个订单</div>
+          <div style="font-size:16px;font-weight:600;color:var(--primary);margin-top:8px" id="queueTime">--</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:600;margin-bottom:8px">订单详情</div>
+        <div style="font-size:14px;color:var(--gray-600)" id="trackDetail">--</div>
+      </div>
+
+      <button class="btn btn-outline btn-block" onclick="showPage('home')">← 返回首页</button>
+    </div>
+  </div>
+
+  <!-- ========== 历史订单 ========== -->
+  <div class="page" id="page-history">
+    <div class="container">
+      <div style="font-weight:700;font-size:18px;padding:16px 0">历史订单</div>
+      <div id="historyList"><div class="empty-state">暂无订单记录</div></div>
+      <button class="btn btn-outline btn-block" style="margin-top:16px" onclick="showPage('home')">← 返回首页</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" style="display:none"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
