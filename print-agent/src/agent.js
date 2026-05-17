@@ -23,6 +23,7 @@ class PrintAgent {
     console.log(`[Agent] 打印机: ${config.printerName}`);
     console.log(`[Agent] 服务端: ${config.serverUrl}`);
 
+    await this._checkPython();
     await this._scanAndReportPrinters();
     await this._fetchServerPrinterConfig();
     await this._sendHeartbeat();
@@ -30,6 +31,19 @@ class PrintAgent {
     this._startPolling();
     this._connectWebSocket();
     this._processNextJob();
+  }
+
+  async _checkPython() {
+    try {
+      const { execSync } = require('child_process');
+      const out = execSync('python -c "import win32print; print(win32print.GetDefaultPrinter())"', {
+        timeout: 10000, encoding: 'utf8', windowsHide: true
+      });
+      console.log(`[Agent] Python+pywin32 可用, 默认打印机: ${out.trim()}`);
+    } catch (e) {
+      console.log('[Agent] Python/pywin32 未安装, 将使用 VBS 降级打印');
+      console.log('[Agent] 安装命令: pip install pywin32');
+    }
   }
 
   async _fetchServerPrinterConfig() {

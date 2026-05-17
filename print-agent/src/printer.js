@@ -4,6 +4,10 @@ const fs = require('fs');
 const os = require('os');
 const config = require('./config');
 
+// Python 打印助手的路径
+const PY_HELPER = path.join(__dirname, '..', 'print_helper.py');
+let pyAvailable = null; // null=未检测, true=可用, false=不可用
+
 function printFile(filePath, options = {}) {
   return new Promise((resolve, reject) => {
     const absPath = path.resolve(filePath);
@@ -12,14 +16,26 @@ function printFile(filePath, options = {}) {
     }
 
     const copies = options.copies || 1;
+    const colorMode = options.colorMode || 'bw';
+    const duplex = options.duplex || 'single';
     const printerName = config.printerName;
 
-    console.log(`[Print] 打印: ${absPath} -> "${printerName}" x${copies}`);
+    console.log(`[Print] 打印: ${absPath} -> "${printerName}" ${colorMode} ${duplex} x${copies}`);
 
     if (process.platform === 'win32') {
-      printWindows(absPath, printerName, copies).then(resolve).catch(reject);
+      printWithPython(absPath, printerName, colorMode, duplex, copies)
+        .then(resolve)
+        .catch((pyErr) => {
+          console.log('[Print] Python方案不可用, 降级VBS:', pyErr.message);
+          printWithVBS(absPath, printerName, copies)
+            .then(resolve)
+            .catch((vbsErr) => {
+              console.log('[Print] VBS也失败, 最终降级:', vbsErr.message);
+              fallbackShellPrint(absPath, copies).then(resolve).catch(reject);
+            });
+        });
     } else if (process.platform === 'darwin') {
-      const lpCmd = `lp -d "${printerName}" -n ${copies} "${absPath}"`;
+      const lpCmd = `lp -d "${printerName}" -n ${copies} -o sides=${duplex === 'double' ? 'two-sided-long-edge' : 'one-sided'} "${absPath}"`;
       exec(lpCmd, { timeout: 120000 }, (err, stdout, stderr) => {
         if (err) return reject(err);
         resolve({ method: 'lp', stdout });
@@ -34,12 +50,57 @@ function printFile(filePath, options = {}) {
   });
 }
 
-function printWindows(filePath, printerName, copies) {
+function printWithPython(filePath, printerName, colorMode, duplex, copies) {
   return new Promise((resolve, reject) => {
-    // 参数通过命令行传入 VBS，避免嵌入脚本导致中文编码问题
+    if (pyAvailable === false) {
+      return reject(new Error('Python不可用(已检测)'));
+    }
+
+    // 构建参数: 使用双引号包裹路径，单引号包裹打印机名
+    const args = [
+      `"${PY_HELPER}"`,
+      `"${filePath}"`,
+      `--printer`, `"${printerName}"`,
+      `--color`, colorMode,
+      `--duplex`, duplex === 'double' ? 'double' : 'single',
+      `--copies`, copies,
+    ].join(' ');
+
+    const cmd = `python ${args}`;
+    console.log('[Print] Python:', cmd.substring(0, 120) + '...');
+
+    exec(cmd, { timeout: 120000 }, (err, stdout, stderr) => {
+      if (stderr) console.log('[Print] py stderr:', stderr.trim());
+
+      if (err) {
+        // 检测是否是 pywin32 未安装
+        if (stderr && stderr.includes('ModuleNotFoundError') || (stdout && stdout.includes('请先安装 pywin32'))) {
+          pyAvailable = false;
+        }
+        return reject(new Error(stderr?.trim() || err.message));
+      }
+
+      try {
+        const result = JSON.parse(stdout.trim());
+        if (result.success) {
+          pyAvailable = true;
+          resolve({ method: 'python-win32print', ...result });
+        } else {
+          reject(new Error(result.error || '打印失败'));
+        }
+      } catch (e) {
+        // JSON解析失败，可能是Python崩溃
+        pyAvailable = false;
+        reject(new Error(`Python输出异常: ${stdout?.trim()}`));
+      }
+    });
+  });
+}
+
+function printWithVBS(filePath, printerName, copies) {
+  return new Promise((resolve, reject) => {
     const vbsPath = path.join(os.tmpdir(), 'selfprint_print.vbs');
 
-    // 纯 ASCII VBS 脚本，不嵌入任何参数
     const lines = [
       'Set objWMIService = GetObject("winmgmts:")',
       'Set fso = CreateObject("Scripting.FileSystemObject")',
@@ -48,13 +109,11 @@ function printWindows(filePath, printerName, copies) {
       'printerName = WScript.Arguments(1)',
       'copies = CInt(WScript.Arguments(2))',
       '',
-      "oldDefault = \"\"",
+      'oldDefault = ""',
       'Set colPrinters = objWMIService.ExecQuery("SELECT * FROM Win32_Printer WHERE Default = TRUE")',
       'For Each p In colPrinters',
       '  oldDefault = p.Name',
       'Next',
-      'WScript.Echo "OLD:" & oldDefault',
-      'WScript.Echo "TARGET:" & printerName',
       '',
       'If oldDefault <> printerName Then',
       '  q = "SELECT * FROM Win32_Printer WHERE Name = """ & Replace(printerName, """", """""") & """"',
@@ -83,7 +142,6 @@ function printWindows(filePath, printerName, copies) {
       '  WScript.Echo "ERR: file not found: " & fileName',
       '  WScript.Quit 1',
       'End If',
-      'WScript.Echo "Printing..."',
       'For i = 1 To copies',
       '  objFile.InvokeVerbEx("print")',
       '  WScript.Sleep 800',
@@ -97,32 +155,24 @@ function printWindows(filePath, printerName, copies) {
       '  For Each p In colRestore',
       '    p.SetDefaultPrinter()',
       '  Next',
-      '  WScript.Echo "RESTORED:" & oldDefault',
       'End If'
     ];
-    const vbsCode = lines.join('\r\n');
-
-    fs.writeFileSync(vbsPath, vbsCode, 'ascii');
+    fs.writeFileSync(vbsPath, lines.join('\r\n'), 'ascii');
 
     const cmd = `cscript //Nologo "${vbsPath}" "${filePath}" "${printerName}" ${copies}`;
-    console.log('[Print] cscript + VBS 打印');
+    console.log('[Print] VBS: cscript print.vbs');
 
     exec(cmd, { timeout: 120000 }, (err, stdout, stderr) => {
       if (stdout) console.log('[Print]', stdout.trim());
-      if (stderr) console.log('[Print] err:', stderr.trim());
-      if (err) {
-        console.error('[Print] VBS 失败:', err.message);
-        fallbackPrint(filePath, copies).then(resolve).catch(reject);
-      } else {
-        resolve({ method: 'vbs', stdout: stdout.trim() });
-      }
+      if (err) return reject(new Error(stderr?.trim() || err.message));
+      resolve({ method: 'vbs', stdout: stdout.trim() });
     });
   });
 }
 
-function fallbackPrint(filePath, copies) {
+function fallbackShellPrint(filePath, copies) {
   return new Promise((resolve, reject) => {
-    console.log('[Print] 降级: Start-Process -Verb Print');
+    console.log('[Print] 最终降级: Start-Process -Verb Print');
     let done = 0;
     const runOne = () => {
       if (done >= copies) return resolve({ method: 'fallback' });
