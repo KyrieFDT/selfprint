@@ -6,5 +6,6 @@ module.exports = {
   agentSecret: process.env.AGENT_SECRET || 'agent-dev-secret',
   agentId: process.env.AGENT_ID || 'agent-win-001',
   printerName: process.env.PRINTER_NAME || 'Microsoft Print to PDF',
+  printerType: process.env.PRINTER_TYPE || 'bw',
   pollInterval: parseInt(process.env.POLL_INTERVAL) || 5,
 };

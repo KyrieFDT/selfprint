@@ -3,6 +3,11 @@ const os = require('os');
 
 const router = new Router({ prefix: '/api/network' });
 
+// 手机扫码后可先访问此地址验证连通性
+router.get('/ping', async (ctx) => {
+  ctx.body = { success: true, data: { status: 'ok', server_time: new Date().toISOString() } };
+});
+
 router.get('/info', async (ctx) => {
   const interfaces = os.networkInterfaces();
   const addresses = [];

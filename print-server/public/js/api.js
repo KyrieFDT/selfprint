@@ -139,6 +139,10 @@ const api = {
     return this.request('/config/printers', { method: 'PUT', body: { printers } });
   },
 
+  deletePrinter(id) {
+    return this.request(`/config/printers/${id}`, { method: 'DELETE' });
+  },
+
   selectPrinter(printerName) {
     return this.request('/config/printers/select', { method: 'PUT', body: { printer_name: printerName } });
   },

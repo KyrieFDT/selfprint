@@ -64,8 +64,8 @@ router.put('/printers', auth({ roles: ['owner'] }), async (ctx) => {
         );
       } else {
         await client.query(
-          `INSERT INTO printers (shop_id, name, printer_type, speed_base_sec)
-           VALUES ($1, $2, $3, $4)`,
+          `INSERT INTO printers (shop_id, name, printer_type, speed_base_sec, is_active)
+           VALUES ($1, $2, $3, $4, TRUE)`,
           [shopId, p.name, p.printer_type, p.speed_base_sec]
         );
       }
@@ -81,6 +81,46 @@ router.get('/printers/active', auth(), async (ctx) => {
     [ctx.state.shopId]
   );
   ctx.body = { success: true, data: { printer_name: rows[0]?.config_value || null } };
+});
+
+// 删除打印机（软删除：设置 is_active = false）
+router.delete('/printers/:id', auth({ roles: ['owner'] }), async (ctx) => {
+  const printerId = parseInt(ctx.params.id);
+  const shopId = ctx.state.shopId;
+
+  const { rows } = await query(
+    'SELECT id, name FROM printers WHERE id = $1 AND shop_id = $2',
+    [printerId, shopId]
+  );
+  if (rows.length === 0) {
+    ctx.status = 404;
+    ctx.body = { success: false, message: '打印机不存在' };
+    return;
+  }
+
+  await query(
+    "UPDATE printers SET is_active = FALSE, agent_id = NULL, agent_status = 'offline', updated_at = NOW() WHERE id = $1",
+    [printerId]
+  );
+
+  // 如果选中的正是被删的打印机，清理 active_printer
+  const { rows: activeRows } = await query(
+    "SELECT config_value FROM shop_configs WHERE shop_id = $1 AND config_key = 'active_printer'",
+    [shopId]
+  );
+  if (activeRows[0]?.config_value === rows[0].name) {
+    await query(
+      "DELETE FROM shop_configs WHERE shop_id = $1 AND config_key = 'active_printer'",
+      [shopId]
+    );
+  }
+
+  await query(
+    'INSERT INTO operation_logs (shop_id, action, target_type, target_id, detail) VALUES ($1, $2, $3, $4, $5)',
+    [shopId, 'printer_deleted', 'printer', printerId, JSON.stringify({ name: rows[0].name })]
+  );
+
+  ctx.body = { success: true, message: '打印机已删除' };
 });
 
 // 选择当前使用的打印机（店主从后台下拉切换）

@@ -104,7 +104,7 @@ class PrintAgent {
     try {
       const resp = await axios.get(`${config.serverUrl}/api/agent/pending-jobs`, {
         headers: { Authorization: `Bearer ${config.agentSecret}` },
-        params: { agent_id: config.agentId },
+        params: { agent_id: config.agentId, printer_type: config.printerType },
       });
 
       if (resp.data.success && resp.data.data.has_job) {
@@ -211,7 +211,7 @@ class PrintAgent {
       }
 
       await axios.post(`${config.serverUrl}/api/agent/report-printers`, {
-        agent_id: config.agentId, printers: printerList,
+        agent_id: config.agentId, printers: printerList, printer_type: config.printerType,
       }, { headers: { Authorization: `Bearer ${config.agentSecret}` } });
     } catch (err) {}
   }

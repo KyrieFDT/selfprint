@@ -28,6 +28,7 @@ function auth({ required = true, roles = [] } = {}) {
 
       return next();
     } catch (err) {
+      if (!required) return next();
       ctx.status = 401;
       ctx.body = { success: false, message: '登录已过期，请重新登录' };
     }

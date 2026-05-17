@@ -5,6 +5,21 @@ const { v4: uuidv4 } = require('uuid');
 const { PDFDocument } = require('pdf-lib');
 const { getUploadPath, UPLOAD_DIR } = require('../../utils/storage');
 
+const LIBREOFFICE_PATHS = [
+  'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+  'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+];
+let libreOfficePath = null;
+
+function findLibreOffice() {
+  if (libreOfficePath !== null) return libreOfficePath;
+  for (const p of LIBREOFFICE_PATHS) {
+    if (fs.existsSync(p)) { libreOfficePath = p; return p; }
+  }
+  libreOfficePath = false;
+  return null;
+}
+
 const MAX_PREVIEW_PAGES = 50;
 
 async function generatePreviews(filePath, ext, pages, dateStr) {
@@ -47,10 +62,10 @@ async function generatePreviews(filePath, ext, pages, dateStr) {
       if (!fs.existsSync(previewDir)) fs.mkdirSync(previewDir, { recursive: true });
 
       const pdfOutput = path.join(previewDir, `${baseName}_converted.pdf`);
+      const soPath = findLibreOffice();
+      if (!soPath) throw new Error('LibreOffice not found');
       await new Promise((resolve, reject) => {
-        const cmd = process.platform === 'win32'
-          ? `"C:\\Program Files\\LibreOffice\\program\\soffice.exe" --headless --convert-to pdf --outdir "${previewDir}" "${filePath}"`
-          : `libreoffice --headless --convert-to pdf --outdir "${previewDir}" "${filePath}"`;
+        const cmd = `"${soPath}" --headless --convert-to pdf --outdir "${previewDir}" "${filePath}"`;
         exec(cmd, { timeout: 30000 }, (err) => {
           if (err) reject(err); else resolve();
         });
@@ -122,10 +137,10 @@ async function formatDocument(filePath, ext) {
 
   if (['.doc', '.docx'].includes(ext)) {
     try {
+      const soPath2 = findLibreOffice();
+      if (!soPath2) throw new Error('LibreOffice not found');
       await new Promise((resolve, reject) => {
-        const cmd = process.platform === 'win32'
-          ? `"C:\\Program Files\\LibreOffice\\program\\soffice.exe" --headless --convert-to pdf --outdir "${outputDir}" "${filePath}"`
-          : `libreoffice --headless --convert-to pdf --outdir "${outputDir}" "${filePath}"`;
+        const cmd = `"${soPath2}" --headless --convert-to pdf --outdir "${outputDir}" "${filePath}"`;
         exec(cmd, { timeout: 30000 }, (err) => {
           if (err) reject(err); else resolve();
         });

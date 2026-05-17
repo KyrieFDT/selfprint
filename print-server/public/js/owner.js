@@ -107,11 +107,13 @@ async function loadPrinters() {
         <select data-id="${p.id}" data-field="printer_type" style="font-size:13px">
           <option value="bw" ${p.printer_type === 'bw' ? 'selected' : ''}>黑白</option>
           <option value="color" ${p.printer_type === 'color' ? 'selected' : ''}>彩色</option>
+          <option value="photo" ${p.printer_type === 'photo' ? 'selected' : ''}>照片</option>
         </select>
         <input type="number" step="0.1" value="${p.speed_base_sec}" data-id="${p.id}" data-field="speed_base_sec" style="width:65px;font-size:13px">
         <span style="font-size:11px;color:var(--gray-500)">秒/面</span>
         ${statusBadge}
         ${p.agent_id ? '<span style="font-size:10px;color:var(--gray-400)" title="由PC代理自动检测">🔗 代理</span>' : ''}
+        <button class="btn btn-sm btn-outline" style="color:var(--danger);font-size:11px;margin-left:4px" onclick="deletePrinter(${p.id}, '${p.name}')">删除</button>
       </div>`;
     }).join('');
   } catch (err) { showToast('加载打印机失败', 'error'); }
@@ -142,15 +144,34 @@ function addPrinter() {
 function renderPrintersFromState() {
   document.getElementById('printerList').innerHTML = ownerState.printers.map((p, i) => `
     <div class="price-row">
-      <input type="text" value="${p.name}" data-idx="${i}" data-field="name" style="width:150px">
-      <select data-idx="${i}" data-field="printer_type">
+      <input type="text" value="${p.name}" data-id="${p.id || ''}" data-field="name" style="width:150px">
+      <select data-id="${p.id || ''}" data-field="printer_type">
         <option value="bw" ${p.printer_type === 'bw' ? 'selected' : ''}>黑白</option>
         <option value="color" ${p.printer_type === 'color' ? 'selected' : ''}>彩色</option>
+        <option value="photo" ${p.printer_type === 'photo' ? 'selected' : ''}>照片</option>
       </select>
-      <input type="number" step="0.1" value="${p.speed_base_sec}" data-idx="${i}" data-field="speed_base_sec" style="width:80px">
+      <input type="number" step="0.1" value="${p.speed_base_sec}" data-id="${p.id || ''}" data-field="speed_base_sec" style="width:80px">
       <span style="font-size:11px;color:var(--gray-500)">秒/面</span>
+      <button class="btn btn-sm btn-outline" style="color:var(--danger);font-size:11px" onclick="deletePrinter(${p.id}, '${p.name}')">删除</button>
     </div>
   `).join('');
+}
+
+async function deletePrinter(printerId, printerName) {
+  if (!printerId) {
+    ownerState.printers = ownerState.printers.filter(p => p.name !== printerName);
+    renderPrintersFromState();
+    showToast('已移除未保存的打印机');
+    return;
+  }
+  if (!confirm(`确定要删除打印机 "${printerName}" 吗？`)) return;
+  try {
+    await api.deletePrinter(printerId);
+    showToast('打印机已删除');
+    await loadPrinters();
+  } catch (err) {
+    showToast('删除失败: ' + err.message, 'error');
+  }
 }
 
 async function loadOptions() {

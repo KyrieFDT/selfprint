@@ -70,6 +70,12 @@ router.get('/preview/:path(.*)', auth({ required: false }), async (ctx) => {
   const fileRelPath = ctx.params.path;
   const absPath = getAbsPath(fileRelPath);
 
+  if (!absPath.startsWith(UPLOAD_DIR)) {
+    ctx.status = 403;
+    ctx.body = { success: false, message: '无效的文件路径' };
+    return;
+  }
+
   if (!fs.existsSync(absPath)) {
     ctx.status = 404;
     ctx.body = { success: false, message: '文件不存在或已过期' };
@@ -85,6 +91,30 @@ router.get('/preview/:path(.*)', auth({ required: false }), async (ctx) => {
 
   ctx.set('Content-Type', mimeMap[ext] || 'application/octet-stream');
   ctx.set('Cache-Control', 'private, max-age=3600');
+  ctx.body = fs.createReadStream(absPath);
+});
+
+// 文件下载端点 (Content-Disposition: attachment)
+router.get('/download/:path(.*)', auth({ required: false }), async (ctx) => {
+  const fileRelPath = ctx.params.path;
+  const absPath = getAbsPath(fileRelPath);
+
+  if (!absPath.startsWith(UPLOAD_DIR)) {
+    ctx.status = 403;
+    ctx.body = { success: false, message: '无效的文件路径' };
+    return;
+  }
+
+  if (!fs.existsSync(absPath)) {
+    ctx.status = 404;
+    ctx.body = { success: false, message: '文件不存在或已过期' };
+    return;
+  }
+
+  const fileName = path.basename(absPath);
+  ctx.set('Content-Type', 'application/octet-stream');
+  ctx.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+  ctx.set('Cache-Control', 'private, max-age=60');
   ctx.body = fs.createReadStream(absPath);
 });
 

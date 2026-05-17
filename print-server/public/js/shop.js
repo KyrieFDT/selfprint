@@ -142,14 +142,15 @@ function renderPrinters(printers) {
         <span style="font-size:13px;font-weight:600">${p.name}</span>
         ${isActive ? '<span style="font-size:11px;color:var(--primary);margin-left:4px">◀ 当前</span>' : ''}
       </div>
-      <span style="font-size:12px;color:var(--gray-500)">${p.printer_type === 'bw' ? '黑白' : '彩色'} · ${statusText}</span>
+      <span style="font-size:12px;color:var(--gray-500)">${p.printer_type === 'photo' ? '照片' : (p.printer_type === 'color' ? '彩色' : '黑白')} · ${statusText}</span>
     </div>`;
   }).join('');
 
   // 填充下拉框
   const currentVal = select.value;
+  const typeLabel = (t) => t === 'photo' ? '照片' : (t === 'color' ? '彩色' : '黑白');
   select.innerHTML = '<option value="">-- 选择打印机 --</option>' +
-    printers.map(p => `<option value="${p.name}">${p.name} (${p.printer_type === 'color' ? '彩色' : '黑白'})</option>`).join('');
+    printers.map(p => `<option value="${p.name}">${p.name} (${typeLabel(p.printer_type)})</option>`).join('');
   if (activePrinter) {
     select.value = activePrinter;
     hint.textContent = '当前打印: ' + activePrinter;
@@ -195,6 +196,7 @@ function renderPending(orders) {
       <div style="text-align:right">
         <div style="font-size:18px;font-weight:700;color:var(--primary)">¥${parseFloat(o.total_amount || 0).toFixed(2)}</div>
         <button class="btn btn-outline btn-xs" onclick="previewOrderById(${o.id})" style="margin-top:4px">预览</button>
+        <button class="btn btn-outline btn-xs" onclick="downloadFile('${o.file_url}')" style="margin-top:4px">下载</button>
         <button class="btn btn-success btn-xs" onclick="confirmPay(${o.id})" style="margin-top:4px">确认收款</button>
         <button class="btn btn-danger btn-xs" onclick="cancelOrder(${o.id})" style="margin-top:4px">取消</button>
       </div>
@@ -218,7 +220,8 @@ function renderQueue(queue, printing) {
         </div>
         <div style="display:flex;gap:4px">
           <button class="btn btn-outline btn-xs" onclick="previewOrderById(${o.id})">预览</button>
-          <button class="btn btn-success btn-xs" onclick="completeOrder(${o.id}, true)">完成</button>
+          <button class="btn btn-outline btn-xs" onclick="downloadFile('${o.file_url}')">下载</button>
+          <button class="btn btn-success btn-xs" onclick="completeOrder(${o.id})">完成</button>
         </div>
       </div>
     `).join('');
@@ -237,6 +240,7 @@ function renderQueue(queue, printing) {
         </div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn btn-outline btn-xs" onclick="previewOrderById(${o.id || item.order_id})">预览</button>
+          <button class="btn btn-outline btn-xs" onclick="downloadFile('${o.file_url || ''}')">下载</button>
           <button class="btn btn-primary btn-xs" onclick="startPrint(${o.id || item.order_id})">开始打印</button>
           <button class="btn btn-danger btn-xs" onclick="cancelQueueOrder(${o.id || item.order_id})">取消</button>
         </div>
@@ -269,9 +273,16 @@ async function previewOrderById(orderId) {
 
     const previewUrl = '/api/files/preview/' + fileUrl;
 
+    // Word 文档无预览时给出降级提示
+    const ext = (order.file_name || '').split('.').pop().toLowerCase();
+    const noPreview = order.preview_urls && order.preview_urls.length === 0;
+
     if (typeof pdfjsLib !== 'undefined') {
-      // Use PDF.js to render pages
-      const pdf = await pdfjsLib.getDocument(previewUrl).promise;
+      // 通过 URL 参数传递 token，让 PDF.js 内部 fetch 也能带认证
+      const urlWithAuth = shopState.token
+        ? previewUrl + '?token=' + encodeURIComponent(shopState.token)
+        : previewUrl;
+      const pdf = await pdfjsLib.getDocument(urlWithAuth).promise;
       modalState.pdfDoc = pdf;
       modalState.totalPages = pdf.numPages;
       modalState.idx = 0;
@@ -436,6 +447,16 @@ async function completeOrder(orderId) {
   } catch (err) {
     showToast('操作失败: ' + err.message, 'error');
   }
+}
+
+function downloadFile(fileUrl) {
+  if (!fileUrl) { showToast('文件链接不存在', 'error'); return; }
+  const a = document.createElement('a');
+  a.href = '/api/files/download/' + fileUrl;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 initShop();
