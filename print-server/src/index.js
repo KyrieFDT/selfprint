@@ -11,8 +11,7 @@ if (!config.pcAgentSecret && config.env !== 'development') {
   process.exit(1);
 }
 if (config.env === 'development' && !config.pcAgentSecret) {
-  console.warn('[WARN] PC_AGENT_SECRET 未设置，开发模式下使用临时密钥');
-  config.pcAgentSecret = 'agent-dev-temp-' + Math.random().toString(36).slice(2);
+  config.pcAgentSecret = 'agent-dev-secret';
 }
 
 const server = http.createServer(app.callback());
