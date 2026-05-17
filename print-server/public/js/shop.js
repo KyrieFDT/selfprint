@@ -76,6 +76,11 @@ function switchTab(tab) {
 async function refreshAll() {
   try {
     const data = await api.getQueue();
+    // 加载当前选中的打印机
+    try {
+      const active = await api.getActivePrinter();
+      activePrinter = active.printer_name || '';
+    } catch (e) {}
     renderPrinters(data.printers || []);
 
     // Fetch all paid/printing orders
@@ -112,24 +117,59 @@ async function refreshCurrentTab() {
   } catch (e) {}
 }
 
+let activePrinter = '';
+
 function renderPrinters(printers) {
   const panel = document.getElementById('printerPanel');
+  const select = document.getElementById('printerSelect');
+  const hint = document.getElementById('activePrinterHint');
+
   if (!printers || printers.length === 0) {
     panel.innerHTML = '<div class="empty">暂无打印机</div>';
+    select.innerHTML = '<option value="">-- 无可用打印机 --</option>';
+    hint.textContent = '';
     return;
   }
+
   panel.innerHTML = printers.map(p => {
     const dot = (p.agent_status === 'online' || p.agent_status === 'idle') ? 'online'
       : (p.agent_status === 'printing' ? 'printing' : 'offline');
     const statusText = dot === 'online' ? '就绪' : (dot === 'printing' ? '工作中' : '离线');
+    const isActive = p.name === activePrinter;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
       <div>
         <span class="status-dot ${dot}"></span>
         <span style="font-size:13px;font-weight:600">${p.name}</span>
+        ${isActive ? '<span style="font-size:11px;color:var(--primary);margin-left:4px">◀ 当前</span>' : ''}
       </div>
       <span style="font-size:12px;color:var(--gray-500)">${p.printer_type === 'bw' ? '黑白' : '彩色'} · ${statusText}</span>
     </div>`;
   }).join('');
+
+  // 填充下拉框
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">-- 选择打印机 --</option>' +
+    printers.map(p => `<option value="${p.name}">${p.name} (${p.printer_type === 'color' ? '彩色' : '黑白'})</option>`).join('');
+  if (activePrinter) {
+    select.value = activePrinter;
+    hint.textContent = '当前打印: ' + activePrinter;
+  } else if (currentVal) {
+    select.value = currentVal;
+  }
+}
+
+async function selectPrinter() {
+  const select = document.getElementById('printerSelect');
+  const name = select.value;
+  if (!name) { showToast('请先选择一台打印机', 'error'); return; }
+  try {
+    await api.selectPrinter(name);
+    activePrinter = name;
+    document.getElementById('activePrinterHint').textContent = '当前打印: ' + name;
+    showToast('已切换打印机: ' + name);
+  } catch (err) {
+    showToast('切换失败: ' + err.message, 'error');
+  }
 }
 
 function renderPending(orders) {

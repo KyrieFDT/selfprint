@@ -15,6 +15,27 @@ function agentAuth(ctx, next) {
   return next();
 }
 
+// 代理查询当前应使用的打印机
+router.get('/config', agentAuth, async (ctx) => {
+  const { agent_id } = ctx.query;
+  const { rows } = await query(
+    "SELECT config_value FROM shop_configs WHERE shop_id = 1 AND config_key = 'active_printer'"
+  );
+  const activePrinter = rows[0]?.config_value || null;
+
+  // 如果未设置，取该 agent 上报的第一台在线打印机
+  if (!activePrinter) {
+    const pRows = await query(
+      "SELECT name FROM printers WHERE shop_id = 1 AND agent_id = $1 AND is_active = true ORDER BY sort_order LIMIT 1",
+      [agent_id]
+    );
+    ctx.body = { success: true, data: { printer_name: pRows.rows[0]?.name || null } };
+    return;
+  }
+
+  ctx.body = { success: true, data: { printer_name: activePrinter } };
+});
+
 router.get('/pending-jobs', agentAuth, async (ctx) => {
   const { agent_id } = ctx.query;
 

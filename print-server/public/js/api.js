@@ -139,6 +139,14 @@ const api = {
     return this.request('/config/printers', { method: 'PUT', body: { printers } });
   },
 
+  selectPrinter(printerName) {
+    return this.request('/config/printers/select', { method: 'PUT', body: { printer_name: printerName } });
+  },
+
+  getActivePrinter() {
+    return this.request('/config/printers/active');
+  },
+
   getOptions() {
     return this.request('/config/options');
   },

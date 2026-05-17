@@ -24,11 +24,28 @@ class PrintAgent {
     console.log(`[Agent] 服务端: ${config.serverUrl}`);
 
     await this._scanAndReportPrinters();
+    await this._fetchServerPrinterConfig();
     await this._sendHeartbeat();
     this._startHeartbeat();
     this._startPolling();
     this._connectWebSocket();
     this._processNextJob();
+  }
+
+  async _fetchServerPrinterConfig() {
+    try {
+      const resp = await axios.get(`${config.serverUrl}/api/agent/config`, {
+        headers: { Authorization: `Bearer ${config.agentSecret}` },
+        params: { agent_id: config.agentId },
+      });
+      if (resp.data.success && resp.data.data.printer_name) {
+        const serverPrinter = resp.data.data.printer_name;
+        if (serverPrinter !== config.printerName) {
+          console.log(`[Agent] 服务端指定打印机: ${serverPrinter}`);
+          config.printerName = serverPrinter;
+        }
+      }
+    } catch (err) {}
   }
 
   _connectWebSocket() {
@@ -48,6 +65,13 @@ class PrintAgent {
       this.socket.on('queue_update', (data) => {
         if (data.type === 'new_order') {
           setTimeout(() => this._fetchJob(), 1000);
+        }
+      });
+
+      this.socket.on('printer_change', (data) => {
+        if (data.printer_name && data.printer_name !== config.printerName) {
+          console.log(`[Agent] 店主切换打印机: ${config.printerName} -> ${data.printer_name}`);
+          config.printerName = data.printer_name;
         }
       });
 

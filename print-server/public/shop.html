@@ -60,6 +60,13 @@
       <div class="panel" style="margin-top:12px">
         <div class="panel-title">🖨️ 打印机状态</div>
         <div id="printerPanel">加载中...</div>
+        <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+          <select id="printerSelect" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--gray-300);font-size:13px">
+            <option value="">-- 选择打印机 --</option>
+          </select>
+          <button class="btn btn-sm btn-primary" onclick="selectPrinter()" style="white-space:nowrap">设为打印</button>
+        </div>
+        <div id="activePrinterHint" style="font-size:11px;color:var(--gray-500);margin-top:4px"></div>
       </div>
 
       <div class="panel" style="margin-top:12px">

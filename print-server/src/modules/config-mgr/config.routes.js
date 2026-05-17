@@ -75,6 +75,60 @@ router.put('/printers', auth({ roles: ['owner'] }), async (ctx) => {
   ctx.body = { success: true, message: '打印机配置已更新' };
 });
 
+router.get('/printers/active', auth(), async (ctx) => {
+  const { rows } = await query(
+    "SELECT config_value FROM shop_configs WHERE shop_id = $1 AND config_key = 'active_printer'",
+    [ctx.state.shopId]
+  );
+  ctx.body = { success: true, data: { printer_name: rows[0]?.config_value || null } };
+});
+
+// 选择当前使用的打印机（店主从后台下拉切换）
+router.put('/printers/select', auth({ roles: ['owner'] }), async (ctx) => {
+  const { printer_name } = ctx.request.body;
+  const shopId = ctx.state.shopId;
+
+  if (!printer_name) {
+    ctx.status = 400;
+    ctx.body = { success: false, message: '请指定打印机名称' };
+    return;
+  }
+
+  // 验证打印机存在
+  const { rows } = await query(
+    'SELECT id FROM printers WHERE shop_id = $1 AND name = $2 AND is_active = true',
+    [shopId, printer_name]
+  );
+  if (rows.length === 0) {
+    ctx.status = 400;
+    ctx.body = { success: false, message: '打印机不存在' };
+    return;
+  }
+
+  // pg-mem 不兼容 ON CONFLICT，用先删后插
+  await query(
+    "DELETE FROM shop_configs WHERE shop_id = $1 AND config_key = 'active_printer'",
+    [shopId]
+  );
+  await query(
+    "INSERT INTO shop_configs (shop_id, config_key, config_value, updated_at) VALUES ($1, 'active_printer', $2, NOW())",
+    [shopId, printer_name]
+  );
+
+  // 通过 WebSocket 通知代理切换打印机
+  const io = ctx.app.context.io;
+  if (io) {
+    io.emit('printer_change', { printer_name });
+  }
+
+  await query(
+    'INSERT INTO operation_logs (shop_id, action, target_type, detail) VALUES ($1, $2, $3, $4)',
+    [shopId, 'printer_selected', 'printer', JSON.stringify({ printer_name })]
+  );
+
+  ctx.body = { success: true, message: `已切换为: ${printer_name}` };
+});
+
 router.get('/options', auth(), async (ctx) => {
   const options = await configService.getOrderOptions(ctx.state.shopId);
   ctx.body = { success: true, data: options };
