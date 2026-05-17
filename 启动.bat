@@ -21,8 +21,8 @@ if %errorlevel% neq 0 (
 
 if not exist "%ROOT%\print-server\node_modules" (
     echo [错误] 依赖未安装，请先运行：
-    echo   cd "%ROOT%\print-server" ^&^& npm install
-    echo   cd "%ROOT%\print-agent" ^&^& npm install
+    echo   cd /d "%ROOT%\print-server" ^&^& npm install
+    echo   cd /d "%ROOT%\print-agent" ^&^& npm install
     pause
     exit /b 1
 )
@@ -32,7 +32,9 @@ echo 环境检查通过
 :: ====================== 启动打印服务 ======================
 echo.
 echo 启动打印服务...
-start "打印服务" /D "%ROOT%\print-server" node src\index.js
+pushd "%ROOT%\print-server"
+start "打印服务" node "%ROOT%\print-server\src\index.js"
+popd
 
 echo 等待服务就绪...
 set tries=0
@@ -43,8 +45,7 @@ powershell -Command "try{$r=Invoke-WebRequest -Uri 'http://localhost:3000/shop.h
 if %errorlevel% equ 0 goto ready
 if %tries% geq 15 (
     echo.
-    echo [错误] 等待45秒服务未就绪
-    echo 请检查是否有红色报错窗口弹出
+    echo [错误] 等待45秒服务未就绪，请检查弹出窗口是否有红色报错
     pause
     exit /b 1
 )
@@ -56,7 +57,7 @@ echo 服务就绪
 :: ====================== 启动打印代理 ======================
 echo.
 echo 启动打印代理...
-start "PC打印代理" /D "%ROOT%\print-agent" node src\index.js
+start "PC打印代理" node "%ROOT%\print-agent\src\index.js"
 
 :: ====================== 打开浏览器 ======================
 echo.
