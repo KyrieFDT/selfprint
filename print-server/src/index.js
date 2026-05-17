@@ -1,4 +1,5 @@
 const http = require('http');
+const { exec } = require('child_process');
 const app = require('./app');
 const config = require('./config');
 const { initSocket } = require('./socket');
@@ -31,6 +32,11 @@ restoreQueue();
 server.listen(config.port, () => {
   console.log(`[Server] 自助打印系统已启动: http://localhost:${config.port}`);
   console.log(`[Server] 环境: ${config.env}`);
+
+  // 自动打开店家工作台
+  const url = `http://localhost:${config.port}/shop.html`;
+  const cmd = process.platform === 'win32' ? `start ${url}` : `open ${url}`;
+  exec(cmd, () => {});
 });
 
 async function restoreQueue() {
