@@ -25,14 +25,8 @@ class PrintAgent {
     await this._scanAndReportPrinters();
     await this._sendHeartbeat();
     this._startHeartbeat();
-
-    try {
-      this._connectWebSocket();
-    } catch (err) {
-      console.log('[Agent] WebSocket不可用，使用轮询模式');
-      this._startPolling();
-    }
-
+    this._startPolling();
+    this._connectWebSocket();
     this._processNextJob();
   }
 
@@ -42,31 +36,25 @@ class PrintAgent {
       query: { token: config.agentSecret },
       reconnection: true,
       reconnectionDelay: 3000,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: 2,
     });
 
     this.socket.on('connect', () => {
       console.log('[Agent] WebSocket已连接');
-      this._sendHeartbeat();
     });
 
     this.socket.on('queue_update', (data) => {
       if (data.type === 'new_order') {
-        console.log('[Agent] 新订单通知，即将拉取');
+        console.log('[Agent] 新订单通知');
         setTimeout(() => this._fetchJob(), 1000);
       }
     });
 
     this.socket.on('disconnect', () => {
-      console.log('[Agent] WebSocket断开，切换轮询');
-      this._startPolling();
+      console.log('[Agent] WebSocket断开');
     });
 
-    this.socket.on('connect_error', () => {
-      console.log('[Agent] WebSocket连接失败，使用轮询');
-      this._startPolling();
-    });
-  }
+    this.socket.on('connect_error', () => {});
 
   _startPolling() {
     if (this.pollTimer) return;
