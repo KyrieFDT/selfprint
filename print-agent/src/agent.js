@@ -84,7 +84,7 @@ class PrintAgent {
     this.isProcessing = true;
 
     const job = this.jobs.shift();
-    console.log(`[Agent] 开始打印: #${job.id} ${job.file_name}`);
+    console.log(`[Agent] 开始打印: #${job.id} ${job.file_name} -> ${config.printerName}`);
 
     try {
       const fileUrl = `${config.serverUrl}/api/files/preview/${job.file_url}`;
@@ -156,11 +156,22 @@ class PrintAgent {
       const printerList = Array.isArray(printers)
         ? printers.map(p => ({
             name: typeof p === 'string' ? p : (p.Name || p.name || ''),
-            is_default: typeof p === 'string' ? p.includes(defaultName) : (p.Name === defaultName || p.name === defaultName),
+            is_default: typeof p === 'string' ? p === defaultName : (p.Name === defaultName || p.name === defaultName),
           }))
         : [];
 
-      console.log(`[Agent] 检测到 ${printerList.length} 台打印机`);
+      console.log(`[Agent] 检测到 ${printerList.length} 台打印机，默认: ${defaultName}`);
+
+      // 如果配置的打印机是虚拟打印机或不在检测列表中，自动切换为系统默认打印机
+      const configuredName = config.printerName;
+      const matchedPrinter = printerList.find(p => p.name === configuredName);
+      if (!matchedPrinter || configuredName.includes('Microsoft Print to PDF') || configuredName.includes('Microsoft XPS')) {
+        if (defaultName && defaultName !== configuredName) {
+          console.log(`[Agent] 打印机 "${configuredName}" 不可用，自动切换为 "${defaultName}"`);
+          config.printerName = defaultName;
+        }
+      }
+
       await axios.post(`${config.serverUrl}/api/agent/report-printers`, {
         agent_id: config.agentId, printers: printerList,
       }, { headers: { Authorization: `Bearer ${config.agentSecret}` } });

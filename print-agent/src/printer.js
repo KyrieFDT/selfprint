@@ -1,6 +1,7 @@
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const config = require('./config');
 
 function printFile(filePath, options = {}) {
@@ -18,36 +19,19 @@ function printFile(filePath, options = {}) {
       layout = '1in1',
     } = options;
 
+    const printerName = config.printerName;
+
     if (process.platform === 'win32') {
-      const printerName = config.printerName.replace(/"/g, '\\"');
-      const vbsScript = createPrintVBS(absPath, printerName, copies);
-
-      const tmpVbs = path.join(require('os').tmpdir(), `print_${Date.now()}.vbs`);
-      fs.writeFileSync(tmpVbs, vbsScript, 'utf-8');
-
-      exec(`cscript //Nologo "${tmpVbs}"`, { timeout: 60000 }, (err, stdout, stderr) => {
-        try { fs.unlinkSync(tmpVbs); } catch (e) { /* ignore */ }
-
-        if (err) {
-          console.error('[Print] VBS执行失败:', err.message);
-          exec(`powershell -Command "Start-Process -FilePath '${absPath}' -ArgumentList '/p','/d:'${config.printerName}'' -NoNewWindow -Wait"`,
-            { timeout: 60000 }, (err2, stdout2, stderr2) => {
-              if (err2) return reject(err2);
-              resolve({ method: 'powershell', stdout: stdout2 });
-            });
-        } else {
-          resolve({ method: 'vbs', stdout });
-        }
-      });
+      printWindows(absPath, printerName, copies).then(resolve).catch(reject);
     } else if (process.platform === 'darwin') {
-      const lpCmd = `lp -d "${config.printerName}" -n ${copies} "${absPath}"`;
-      exec(lpCmd, { timeout: 60000 }, (err, stdout, stderr) => {
+      const lpCmd = `lp -d "${printerName}" -n ${copies} -o sides=${duplex === 'duplex' ? 'two-sided-long-edge' : 'one-sided'} "${absPath}"`;
+      exec(lpCmd, { timeout: 120000 }, (err, stdout, stderr) => {
         if (err) return reject(err);
         resolve({ method: 'lp', stdout });
       });
     } else {
-      const lprCmd = `lpr -P "${config.printerName}" -# ${copies} "${absPath}"`;
-      exec(lprCmd, { timeout: 60000 }, (err, stdout, stderr) => {
+      const lprCmd = `lpr -P "${printerName}" -# ${copies} "${absPath}"`;
+      exec(lprCmd, { timeout: 120000 }, (err, stdout, stderr) => {
         if (err) return reject(err);
         resolve({ method: 'lpr', stdout });
       });
@@ -55,25 +39,97 @@ function printFile(filePath, options = {}) {
   });
 }
 
-function createPrintVBS(filePath, printerName, copies) {
-  return `
+function printWindows(filePath, printerName, copies) {
+  return new Promise((resolve, reject) => {
+    // 方案1: 用 PowerShell 设置目标打印机为默认 → 调用 Shell print → 恢复默认
+    const psScript = `
+$ErrorActionPreference = 'Stop'
+$file = '${filePath.replace(/'/g, "''")}'
+$target = '${printerName.replace(/'/g, "''")}'
+$copies = ${copies}
+
+try {
+  $oldDefault = (Get-WmiObject -Class Win32_Printer -Filter "Default = TRUE" | Select-Object -First 1).Name
+
+  $printer = Get-WmiObject -Class Win32_Printer -Filter "Name = '$target'" | Select-Object -First 1
+  if (-not $printer) {
+    Write-Error "找不到打印机: $target"
+    exit 1
+  }
+
+  if ($oldDefault -ne $target) {
+    $printer.SetDefaultPrinter() | Out-Null
+    Start-Sleep -Milliseconds 500
+  }
+
+  $shell = New-Object -ComObject Shell.Application
+  $folder = $shell.Namespace((Get-Item $file).DirectoryName)
+  $shellFile = $folder.ParseName((Get-Item $file).Name)
+  For ($i = 1; $i -le $copies; $i++) {
+    $shellFile.InvokeVerbEx('print')
+    Start-Sleep -Milliseconds 500
+  }
+  Start-Sleep -Seconds 5
+
+  if ($oldDefault -ne $target -and $oldDefault) {
+    $oldPrinter = Get-WmiObject -Class Win32_Printer -Filter "Name = '$oldDefault'" | Select-Object -First 1
+    if ($oldPrinter) { $oldPrinter.SetDefaultPrinter() | Out-Null }
+  }
+
+  Write-Output 'OK'
+} catch {
+  Write-Error $_.Exception.Message
+  exit 1
+}
+`;
+
+    const psFile = path.join(os.tmpdir(), `print_${Date.now()}.ps1`);
+    fs.writeFileSync(psFile, psScript, 'utf-8');
+
+    exec(`powershell -ExecutionPolicy Bypass -File "${psFile}"`, { timeout: 120000 }, (err, stdout, stderr) => {
+      try { fs.unlinkSync(psFile); } catch (e) { /* ignore */ }
+
+      if (err) {
+        // 降级: 直接用 Shell print (打向系统默认打印机)
+        console.error('[Print] PowerShell方案失败:', err.message);
+        fallbackPrint(filePath, copies).then(resolve).catch(reject);
+      } else {
+        resolve({ method: 'powershell', stdout });
+      }
+    });
+  });
+}
+
+function fallbackPrint(filePath, copies) {
+  return new Promise((resolve, reject) => {
+    const vbs = `
 Set objShell = CreateObject("Shell.Application")
 Set objFolder = objShell.Namespace(0)
 Set objFile = objFolder.ParseName("${filePath.replace(/\\/g, '\\\\')}")
 For i = 1 To ${copies}
   objFile.InvokeVerbEx("print")
 Next
-WScript.Sleep 3000
+WScript.Sleep 5000
 `;
+    const tmpVbs = path.join(os.tmpdir(), `print_${Date.now()}.vbs`);
+    fs.writeFileSync(tmpVbs, vbs, 'utf-8');
+
+    exec(`cscript //Nologo "${tmpVbs}"`, { timeout: 120000 }, (err, stdout, stderr) => {
+      try { fs.unlinkSync(tmpVbs); } catch (e) { /* ignore */ }
+      if (err) return reject(err);
+      resolve({ method: 'vbs', stdout });
+    });
+  });
 }
 
 function getDefaultPrinter() {
   return new Promise((resolve) => {
     if (process.platform === 'win32') {
-      exec('powershell -Command "Get-WmiObject -Query \\"SELECT * FROM Win32_Printer WHERE Default = TRUE\\" | Select-Object -ExpandProperty Name"',
+      exec('powershell -Command "(Get-WmiObject -Class Win32_Printer -Filter \\"Default = TRUE\\" | Select-Object -First 1).Name"',
         (err, stdout) => {
           if (err) return resolve(null);
-          resolve(stdout.trim());
+          const name = stdout.trim();
+          resolve(name || null);
         });
     } else {
       exec('lpstat -d', (err, stdout) => {
@@ -91,7 +147,10 @@ function listPrinters() {
       exec('powershell -Command "Get-Printer | Select-Object Name, PrinterStatus | ConvertTo-Json"',
         (err, stdout) => {
           if (err) return resolve([]);
-          try { resolve(JSON.parse(stdout)); } catch (e) { resolve([]); }
+          try {
+            const parsed = JSON.parse(stdout);
+            resolve(Array.isArray(parsed) ? parsed : [parsed].filter(Boolean));
+          } catch (e) { resolve([]); }
         });
     } else {
       exec('lpstat -p', (err, stdout) => {
